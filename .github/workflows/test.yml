@@ -35,7 +35,7 @@ jobs:
           - model: gpt-4-turbo
             service-provider: openai
             target-language: 'Portuguese'
-          - model: claude-3.7-sonnet
+          - model: claude-3.7-sonnet-latest
             service-provider: anthropic
             target-language: 'German'
           - model: claude-3.5-sonnet
