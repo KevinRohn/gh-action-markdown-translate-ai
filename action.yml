@@ -1,4 +1,4 @@
-name: 'Github Actions Markdown Translate AI'
+name: 'Github Action Markdown Translate AI'
 description: 'A Github Action to translate markdown files using custom AI models'
 author: Kevin Rohn
 
