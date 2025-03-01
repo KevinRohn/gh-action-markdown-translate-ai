@@ -1,0 +1,134 @@
+name: 'Github Actions Markdown Translate AI'
+description: 'A Github Action to translate markdown files using custom AI models'
+author: Kevin Rohn
+
+branding:
+  icon: 'book-open'
+  color: 'white'
+
+inputs:
+  api_key:
+    description: 'API key for the translation service provider'
+    required: true
+  service_provider:
+    description: 'Translation AI service provider to use. Options: openai, anthropic, gemini and deepseek'
+    required: true
+    default: 'openai'
+  model:
+    description: 'Model to use for translation. Options: See README.md'
+    required: true
+    default: 'gpt-4o'
+  source_language:
+    description: 'Source language'
+    required: true
+    default: 'English'
+  target_language:
+    description: 'Target language'
+    required: true
+    default: 'German'
+  file_path:
+    description: 'Path to the markdown file'
+    required: true
+  output_file_path:
+    description: 'Path to the translated markdown file'
+    required: true
+  update_mode:
+    description: 'If this flag is set to true, the original markdown file will be updated with the translated content'
+    default: false
+    required: false
+
+outputs:
+  total_tokens_used:
+    description: 'Total tokens used for translation'
+    value: ${{ steps.statistics.outputs.total_tokens_used }}
+  input_tokens_used:
+    description: 'Input tokens used for translation'
+    value: ${{ steps.statistics.outputs.input_tokens_used }}
+  output_tokens_used:
+    description: 'Output tokens used for translation'
+    value: ${{ steps.statistics.outputs.output_tokens_used }}
+  duration_seconds:
+    description: 'Duration of the translation process in seconds'
+    value: ${{ steps.statistics.outputs.duration_seconds }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install markdown-translate-ai package
+      shell: bash
+      run: | # shell
+        echo "::group::Install dependencies"
+
+        pip install markdown-translate-ai
+
+        echo "::endgroup::"
+
+    - name: Validate inputs
+      shell: bash
+      run: | # shell
+        echo "::group::Validate inputs"
+
+        python ${{ github.action_path }}/src/validate_inputs.py
+
+        echo "::endgroup::"
+      env:
+        INPUT_API_KEY: ${{ inputs.api_key }}
+        INPUT_SERVICE_PROVIDER: ${{ inputs.service_provider }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_SOURCE_LANGUAGE: ${{ inputs.source_language }}
+        INPUT_TARGET_LANGUAGE: ${{ inputs.target_language }}
+        INPUT_FILE_PATH: ${{ inputs.file_path }}
+        INPUT_OUTPUT_FILE_PATH: ${{ inputs.output_file_path }}
+        INPUT_UPDATE_MODE: ${{ inputs.update_mode }}
+
+    - name: Translate
+      shell: bash
+      run: | # shell
+        echo "::group::Translate"
+
+        markdown-translate-ai \
+          ${{ inputs.file_path }} \
+          ${{ inputs.output_file_path }} \
+          ${{ inputs.target_language }} \
+          --source-lang ${{ inputs.source_language }} \
+          --model ${{ inputs.model }} \
+          --stats-file
+        
+        echo "::endgroup::"
+      env: # The API Key is selected based on the service provider
+        OPENAI_API_KEY: ${{ inputs.api_key }}
+        ANTHROPIC_API_KEY: ${{ inputs.api_key }}
+        DEEPSEEK_API_KEY: ${{ inputs.api_key }}
+        GEMINI_API_KEY: ${{ inputs.api_key }}
+        
+    - name: Extract statistics
+      shell: bash
+      id: statistics
+      run: | # shell
+        echo "::group::Extract statistics"
+
+        if [[ -f "${{ inputs.output_file_path }}.stats.json" ]]; then
+          total_tokens_used=$(jq -r '.token_usage.total_tokens' ${{ inputs.output_file_path }}.stats.json)
+          input_tokens_used=$(jq -r '.token_usage.input_tokens' ${{ inputs.output_file_path }}.stats.json)
+          output_tokens_used=$(jq -r '.token_usage.output_tokens' ${{ inputs.output_file_path }}.stats.json)
+          duration_seconds=$(jq -r '.api_calls.duration_seconds' ${{ inputs.output_file_path }}.stats.json)
+
+          rm ${{ inputs.output_file_path }}.stats.json
+
+          echo "total_tokens_used=$total_tokens_used" >> $GITHUB_OUTPUT
+          echo "input_tokens_used=$input_tokens_used" >> $GITHUB_OUTPUT
+          echo "output_tokens_used=$output_tokens_used" >> $GITHUB_OUTPUT
+          echo "duration_seconds=$duration_seconds" >> $GITHUB_OUTPUT
+        else
+          echo "No statistics file found."
+          echo "total_tokens_used=0" >> $GITHUB_OUTPUT
+          echo "input_tokens_used=0" >> $GITHUB_OUTPUT
+          echo "output_tokens_used=0" >> $GITHUB_OUTPUT
+          echo "duration_seconds=0" >> $GITHUB_OUTPUT
+        fi
+
+        echo "::endgroup::"

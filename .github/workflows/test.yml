@@ -1,0 +1,113 @@
+name: Test Markdown Translate AI
+
+on:
+  push:
+    branches: 
+      - main
+
+jobs:
+  test-translation:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        model:
+          - gpt-4o
+          - gpt-4o-mini
+          - gpt-3.5-turbo
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3.5-sonnet
+          - claude-3.5-haiku
+          - gemini-1.5-flash
+        include:
+          - model: gpt-4o
+            service-provider: openai
+            target-language: 'German'
+          - model: gpt-4o-mini
+            service-provider: openai
+            target-language: 'Italian'
+          - model: gpt-3.5-turbo
+            service-provider: openai
+            target-language: 'French'
+          - model: gpt-4
+            service-provider: openai
+            target-language: 'Spanish'
+          - model: gpt-4-turbo
+            service-provider: openai
+            target-language: 'Portuguese'
+          - model: claude-3.7-sonnet
+            service-provider: anthropic
+            target-language: 'German'
+          - model: claude-3.5-sonnet
+            service-provider: anthropic
+            target-language: 'German'
+          - model: claude-3.5-haiku
+            service-provider: anthropic
+            target-language: 'Italian'
+          - model: gemini-1.5-flash
+            service-provider: gemini
+            target-language: 'German'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Test translation file
+        id: file_info
+        run: |
+          echo "source_file=test/en/example.md" >> $GITHUB_OUTPUT
+          echo "target_file=example.md" >> $GITHUB_OUTPUT
+
+      - name: Select API Key based on Service provider
+        run: | # shell
+          case ${{ matrix.service-provider }} in
+            openai)
+              echo "API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
+              ;;
+            anthropic)
+              echo "API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> $GITHUB_ENV
+              ;;
+            gemini)
+              echo "API_KEY=${{ secrets.GEMINI_API_KEY }}" >> $GITHUB_ENV
+              ;;
+            deepseek)
+              echo "API_KEY=${{ secrets.DEEPSEEK_API_KEY }}" >> $GITHUB_ENV
+              ;;
+          esac
+
+      - name: Translate using ${{ matrix.model }} (${{ matrix.service-provider }})
+        id: translation
+        uses: ./
+        with:
+          api_key: ${{ env.API_KEY }}
+          service_provider: ${{ matrix.service-provider }}
+          model: ${{ matrix.model }}
+          source_language: English
+          target_language: ${{ matrix.target-language }}
+          file_path: ${{ steps.file_info.outputs.source_file }}
+          output_file_path: ${{ steps.file_info.outputs.target_file }}
+
+      - name: Show Summary output
+        shell: bash
+        run: | # shell
+          echo "## Translation summary for ${{ matrix.model }} (${{ matrix.service-provider }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total tokens | **${{ steps.translation.outputs.total_tokens_used }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Input tokens | **${{ steps.translation.outputs.input_tokens_used }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Output tokens | **${{ steps.translation.outputs.output_tokens_used }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Duration | **${{ steps.translation.outputs.duration_seconds }}** seconds |" >> $GITHUB_STEP_SUMMARY
+
+          echo "<details><summary>Source content</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat ${{ steps.file_info.outputs.source_file }} >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "<details><summary>Translated content in ${{ matrix.target-language }}</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat ${{ steps.file_info.outputs.target_file }} >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
