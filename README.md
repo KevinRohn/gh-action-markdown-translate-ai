@@ -121,7 +121,7 @@ test-translation:
 
       - name: Translate using ${{ matrix.model }} (${{ matrix.service-provider }})
         id: translation
-        uses: ./
+        uses: KevinRohn/gh-action-markdown-translate-ai@v1
         with:
           api_key: ${{ env.API_KEY }}
           service_provider: ${{ matrix.service-provider }}
